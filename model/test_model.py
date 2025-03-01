@@ -22,8 +22,8 @@ def list_audio_devices():
             if d["max_input_channels"] > 0:
                 print(f"{i}: {d['name']}")
 
-def audio_to_melspectrogram(audio):
-    mel_spec = librosa.feature.melspectrogram(y=audio, sr=22050, n_mels=128)
+def audio_to_melspectrogram(audio, sr=22050):
+    mel_spec = librosa.feature.melspectrogram(y=audio, sr=sr, n_mels=128)
     mel_spec_db = librosa.power_to_db(mel_spec, ref=np.max)  # Convert to dB
     return mel_spec_db
 
@@ -72,7 +72,7 @@ def classify_live_audio(model, map_index_class, input_device=None, window_size =
 
         # Convert audio to mel spectrogram
         audio = librosa.util.normalize(audio)
-        mel_spec = audio_to_melspectrogram(audio)
+        mel_spec = audio_to_melspectrogram(audio, sr=sr)
         mel_spec = torch.tensor(mel_spec).unsqueeze(0).unsqueeze(0).to(device)
 
         # Make prediction
@@ -126,7 +126,7 @@ if __name__ == "__main__":
         device_index = int(device_index)
     
     
-    classify_live_audio(model=model, map_index_class=map_index_class, input_device=device_index)
+    classify_live_audio(model=model, map_index_class=map_index_class, input_device=device_index, sr=22050, window_size=0.5)
     
     # ## input 
     # file_path = r"H:\DSP_project\ignoredir\dataset\archive2\Train_submission\Train_submission\violin_sound (241).wav"
