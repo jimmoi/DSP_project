@@ -12,7 +12,7 @@ with timer("import lib"):
     import librosa
     import pickle
     import sounddevice as sd
-    from train_model.model import InstrumentClassifier_CBAM
+    from model.train_model.model import InstrumentClassifier_CBAM
     
 def list_audio_devices():
         """ Lists all available audio input devices """
@@ -98,8 +98,6 @@ def classify_live_audio(model, map_index_class, input_device=None, window_size =
         predicted_class = sorted_labels[-1]
         print(f"Predicted Instrument: {predicted_class} ({sorted_probs[-1]:.2f})")
 
-
-
 if __name__ == "__main__":
     
     ## load model
@@ -107,7 +105,7 @@ if __name__ == "__main__":
         device = "cuda" if torch.cuda.is_available else "cpu"
         model = InstrumentClassifier_CBAM(28)
         model.to(device)
-        model.load_state_dict(torch.load(r'H:\DSP_project\ignoredir\model\instrument_classifier_cbam_200_0.0001_weight.pt'))
+        model.load_state_dict(torch.load(r'D:\git_project\DSP_project\model\instrument_classifier_cbam_200_0.0001_weight.pt'))
         model.eval()
         
         
