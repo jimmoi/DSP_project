@@ -18,8 +18,18 @@ import matplotlib.pyplot as plt
 # Initialize session state
 if "run" not in st.session_state:
     st.session_state.run = False
+
 if "audio_frames" not in st.session_state:
     st.session_state.audio_frames = []
+
+if "expanded" not in st.session_state:
+    st.session_state.expanded = False
+
+if st.button("Expand" if not st.session_state.expanded else "Collapse"):
+    st.session_state.expanded = not st.session_state.expanded  
+
+if "fig" not in st.session_state:
+    st.session_state.fig, (st.session_state.ax1, st.session_state.ax2) = plt.subplots(2, 1, figsize=(6, 8))
 
 # Start/Stop button logic
 def start_listening():
@@ -55,8 +65,8 @@ device_index = device_indices[device_list.index(selected_device)]
 # Audio parameters
 FORMAT = pyaudio.paInt16
 CHANNELS = 1
-RATE = 44100
-FRAMES_PER_BUFFER = int(0.25 * RATE)
+RATE = 22050 #44100
+FRAMES_PER_BUFFER = int(0.5 * RATE) #0.25
 
 with open(r"model\train_model\encoder.pkl", "rb") as f:
     encoder = pickle.load(f)
@@ -112,17 +122,52 @@ if st.session_state.run:
         class_labels = list(map_index_class.values())
         sorted_labels = [class_labels[i] for i in sorted_indices]
 
-        # Plot real-time classification probabilities
-        fig, ax = plt.subplots(figsize=(6, 4))
-        ax.barh(sorted_labels, sorted_probs, color="blue")
-        ax.set_xlim(0, 1)
-        ax.set_xlabel("Probability")
-        ax.set_title("Real-Time Classification Probabilities")
+        # 🔹 เลือกข้อมูลที่จะแสดง
+        top_n = -5
+        if st.session_state.expanded:
+            labels, probs = sorted_labels, sorted_probs  # แสดงทั้งหมด
+        else:
+            labels, probs = sorted_labels[top_n:], sorted_probs[top_n:]  # แสดง Top 5
 
-        # Update the plot in Streamlit
-        plot_placeholder.pyplot(fig)
+        if len(labels) == 0 or len(probs) == 0:
+            st.warning("No data available for plotting!")
+        else:
+            fig, (ax1, ax2) = st.session_state.fig, (st.session_state.ax1, st.session_state.ax2)
+            ax1.clear()
+            ax2.clear()
+            background_color = (12/255, 14/255, 19/255)
+            time_axis = np.linspace(0, 0.5, FRAMES_PER_BUFFER)
+            ax1.set_facecolor(background_color)
+            ax1.plot(time_axis, audio_np, color='cyan', linewidth=1.5)
+            ax1.set_title("Real-Time Audio Signal", color="white")
+            ax1.set_xlabel("Time (s)", color="white")
+            ax1.set_ylabel("Amplitude", color="white")
+            ax1.tick_params(axis='x', colors='white')
+            ax1.tick_params(axis='y', colors='white')
+            # Plot real-time classification probabilities
+            # fig, ax = plt.subplots(figsize=(6, max(len(labels) * 0.8, 4)))
+            fig.patch.set_facecolor(background_color)
+            ax2.set_facecolor(background_color)
 
-        time.sleep(0.1)  # Update interval
+            y_positions = [i * 2 for i in range(len(labels))]
+
+            ax2.barh(y_positions, probs, height=1, color="blue")
+
+            ax2.set_yticks(y_positions)
+            ax2.set_yticklabels(labels, color='white')
+            # ax.tick_params(axis='y', colors='white')
+
+            ax2.set_xlim(0, 1)
+            ax2.set_xlabel("Probability", color='white')
+            ax2.set_title("Real-Time Classification Probabilities", color='white')
+
+            ax2.tick_params(axis='x', colors='white')
+            ax2.tick_params(axis='y', colors='white')
+
+            # Update the plot in Streamlit
+            plot_placeholder.pyplot(fig)
+
+            time.sleep(0.1)  # Update interval
 
     stream.stop_stream()
     stream.close()
