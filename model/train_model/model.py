@@ -21,7 +21,7 @@ from sklearn.metrics import classification_report, confusion_matrix
 
 
 class InstrumentDataset(Dataset):
-    def __init__(self, dataframe, onehot, target_sr=22050, window_size=0.5, hop_size=0.25, n_mels=128):
+    def __init__(self, dataframe, onehot, target_sr=22050, window_size=1, hop_size=0.25, n_mels=256):
         """
         dataframe: Pandas DataFrame containing 'filepath' and 'Class' columns.
         onehot: OneHotEncoder instance for encoding class labels.
@@ -30,6 +30,7 @@ class InstrumentDataset(Dataset):
         hop_size: Step size between windows in seconds (default 1 sec).
         n_mels: Number of Mel bands.
         """
+        
         self.file_list = dataframe["fname"].values
         self.labels = dataframe["Class"].values
         # self.duration = dataframe["duration"].values
@@ -51,8 +52,9 @@ class InstrumentDataset(Dataset):
         processed_data = []
         for file_path, label in zip(self.file_list, self.labels):
             y, sr = librosa.load(file_path, sr=self.target_sr)  # Load & resample
-            y, _ = librosa.effects.trim(y, top_db=10) # Removes initial and end silence
-            y = librosa.util.normalize(y)  # Normalize waveform
+            y_trim, _ = librosa.effects.trim(y, top_db=10) # Removes initial and end silence
+            y_noisy = y_trim + np.random.normal(0, 0.005 * np.max(np.abs(y_trim)), y_trim.shape)
+            y = librosa.util.normalize(y_noisy)  # Normalize waveform
             num_samples = int(self.window_size * sr)  # Convert window size to samples
             hop_samples = int(self.hop_size * sr)  # Convert hop size to samples
             
@@ -134,15 +136,16 @@ class InstrumentClassifier_CBAM(nn.Module):
 
     def forward(self, x):
         # Convolutional layers with CBAM
-        x = self.pool(F.relu(self.conv1(x)))  # (11, 64, 8)
+        #(128, 22, 1)
+        x = self.pool(F.relu(self.conv1(x)))  # (22, 128, 8)
         x = self.cbam1(x)
         x = self.bn1(x)
 
-        x = self.pool(F.relu(self.conv2(x)))  # (5, 32, 16)
+        x = self.pool(F.relu(self.conv2(x)))  # (11, 64, 16)
         x = self.cbam2(x)
         x = self.bn2(x)
 
-        x = F.relu(self.conv3(x))  # (5, 32, 32)
+        x = self.pool(F.relu(self.conv3(x)))  # (5, 32, 32)
         x = self.cbam3(x)
 
         # Flatten
@@ -158,34 +161,34 @@ class InstrumentClassifier_CBAM(nn.Module):
 
 
 
-class InstrumentClassifier(nn.Module):
-    def __init__(self, num_classes):
-        super(InstrumentClassifier, self).__init__()
-        self.conv1 = nn.Conv2d(1, 8, kernel_size=3, stride=1, padding=1)  # Conv Layer 1
-        self.bn1 = nn.BatchNorm2d(8)
-        self.conv2 = nn.Conv2d(8, 16, kernel_size=3, stride=1, padding=1)  # Conv Layer 2
-        self.bn2 = nn.BatchNorm2d(16)
-        self.conv3 = nn.Conv2d(16, 32, kernel_size=3, stride=1, padding=1)  # Conv Layer 3
-        self.pool = nn.MaxPool2d(2, 2)  # Max pooling
-        self.fc1 = nn.Linear(32 * 5 * 32, 1024)  # Fully connected layer
-        self.fc2 = nn.Linear(1024, 512)
-        self.fc3 = nn.Linear(512, 256)
-        self.fc4 = nn.Linear(256, num_classes)  # Output layer
+# class InstrumentClassifier(nn.Module):
+#     def __init__(self, num_classes):
+#         super(InstrumentClassifier, self).__init__()
+#         self.conv1 = nn.Conv2d(1, 8, kernel_size=3, stride=1, padding=1)  # Conv Layer 1
+#         self.bn1 = nn.BatchNorm2d(8)
+#         self.conv2 = nn.Conv2d(8, 16, kernel_size=3, stride=1, padding=1)  # Conv Layer 2
+#         self.bn2 = nn.BatchNorm2d(16)
+#         self.conv3 = nn.Conv2d(16, 32, kernel_size=3, stride=1, padding=1)  # Conv Layer 3
+#         self.pool = nn.MaxPool2d(2, 2)  # Max pooling
+#         self.fc1 = nn.Linear(32 * 5 * 32, 1024)  # Fully connected layer
+#         self.fc2 = nn.Linear(1024, 512)
+#         self.fc3 = nn.Linear(512, 256)
+#         self.fc4 = nn.Linear(256, num_classes)  # Output layer
 
-    def forward(self, x):
-        # 22 x 128
-        x = self.pool(F.relu(self.conv1(x))) # 11 x 64 x 8
-        # x = self.cbam(x)
-        x = self.bn1(x)
-        x = self.pool(F.relu(self.conv2(x))) # 5 x 32 x 16
-        x = self.bn2(x)
-        x = F.relu(self.conv3(x)) # 5 x 32 x 32
+#     def forward(self, x):
+#         # 22 x 128
+#         x = self.pool(F.relu(self.conv1(x))) # 11 x 64 x 8
+#         # x = self.cbam(x)
+#         x = self.bn1(x)
+#         x = self.pool(F.relu(self.conv2(x))) # 5 x 32 x 16
+#         x = self.bn2(x)
+#         x = F.relu(self.conv3(x)) # 5 x 32 x 32
         
-        x = x.view(x.size(0), -1)  # Flatten
-        x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
-        x = F.relu(self.fc3(x))
-        x = self.fc4(x)
-        return x
+#         x = x.view(x.size(0), -1)  # Flatten
+#         x = F.relu(self.fc1(x))
+#         x = F.relu(self.fc2(x))
+#         x = F.relu(self.fc3(x))
+#         x = self.fc4(x)
+#         return x
 
 

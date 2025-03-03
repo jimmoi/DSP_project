@@ -12,7 +12,8 @@ with timer("import lib"):
     import librosa
     import pickle
     import sounddevice as sd
-    from model.train_model.model import InstrumentClassifier_CBAM
+    from train_model.model import InstrumentClassifier_CBAM
+    from collections import deque
     
 def list_audio_devices():
         """ Lists all available audio input devices """
@@ -22,8 +23,8 @@ def list_audio_devices():
             if d["max_input_channels"] > 0:
                 print(f"{i}: {d['name']}")
 
-def audio_to_melspectrogram(audio):
-    mel_spec = librosa.feature.melspectrogram(y=audio, sr=22050, n_mels=128)
+def audio_to_melspectrogram(audio, sr=22050):
+    mel_spec = librosa.feature.melspectrogram(y=audio, sr=sr, n_mels=128)
     mel_spec_db = librosa.power_to_db(mel_spec, ref=np.max)  # Convert to dB
     return mel_spec_db
 
@@ -34,8 +35,7 @@ def predictions(sound, model, device, onehot, map_index_class):
     #transform 
     y = librosa.util.normalize(sound)
     y = audio_to_melspectrogram(y)
-    y = torch.tensor(y).unsqueeze(0)
-    y = y.unsqueeze(0)
+    y = torch.tensor(y).unsqueeze(0).unsqueeze(0).to(device)
 
     with torch.no_grad():
         y = y.to(device)
@@ -49,7 +49,7 @@ def predictions(sound, model, device, onehot, map_index_class):
     
     return result
 
-def classify_live_audio(model, map_index_class, input_device=None, window_size = 0.5, sr = 22050):
+def classify_live_audio(model, map_index_class, input_device, window_size=0.5, overlap=0.25, sr=22050):
     """ Real-time audio classification with loopback support and probability plot """
     # Select input device
     if input_device is not None:
@@ -72,7 +72,7 @@ def classify_live_audio(model, map_index_class, input_device=None, window_size =
 
         # Convert audio to mel spectrogram
         audio = librosa.util.normalize(audio)
-        mel_spec = audio_to_melspectrogram(audio)
+        mel_spec = audio_to_melspectrogram(audio, sr=sr)
         mel_spec = torch.tensor(mel_spec).unsqueeze(0).unsqueeze(0).to(device)
 
         # Make prediction
@@ -124,7 +124,7 @@ if __name__ == "__main__":
         device_index = int(device_index)
     
     
-    classify_live_audio(model=model, map_index_class=map_index_class, input_device=device_index)
+    classify_live_audio(model=model, map_index_class=map_index_class, input_device=device_index, sr=22050, window_size=0.5)
     
     # ## input 
     # file_path = r"H:\DSP_project\ignoredir\dataset\archive2\Train_submission\Train_submission\violin_sound (241).wav"
