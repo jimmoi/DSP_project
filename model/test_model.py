@@ -13,6 +13,7 @@ with timer("import lib"):
     import pickle
     import sounddevice as sd
     from train_model.model import InstrumentClassifier_CBAM
+    from collections import deque
     
 def list_audio_devices():
         """ Lists all available audio input devices """
@@ -34,8 +35,7 @@ def predictions(sound, model, device, onehot, map_index_class):
     #transform 
     y = librosa.util.normalize(sound)
     y = audio_to_melspectrogram(y)
-    y = torch.tensor(y).unsqueeze(0)
-    y = y.unsqueeze(0)
+    y = torch.tensor(y).unsqueeze(0).unsqueeze(0).to(device)
 
     with torch.no_grad():
         y = y.to(device)
@@ -49,7 +49,7 @@ def predictions(sound, model, device, onehot, map_index_class):
     
     return result
 
-def classify_live_audio(model, map_index_class, input_device=None, window_size = 0.5, sr = 22050):
+def classify_live_audio(model, map_index_class, input_device, window_size=0.5, overlap=0.25, sr=22050):
     """ Real-time audio classification with loopback support and probability plot """
     # Select input device
     if input_device is not None:
