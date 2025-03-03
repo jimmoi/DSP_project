@@ -29,7 +29,7 @@ if st.button("Expand" if not st.session_state.expanded else "Collapse"):
     st.session_state.expanded = not st.session_state.expanded  
 
 if "fig" not in st.session_state:
-    st.session_state.fig, (st.session_state.ax1, st.session_state.ax2) = plt.subplots(2, 1, figsize=(6, 8))
+    st.session_state.fig, (st.session_state.ax1, st.session_state.ax2) = plt.subplots(nrows=1, ncols=2, figsize=(10, 5))
 
 # Start/Stop button logic
 def start_listening():
@@ -66,7 +66,7 @@ device_index = device_indices[device_list.index(selected_device)]
 FORMAT = pyaudio.paInt16
 CHANNELS = 1
 RATE = 22050 #44100
-FRAMES_PER_BUFFER = int(0.5 * RATE) #0.25
+FRAMES_PER_BUFFER = int(RATE*0.5) #0.25
 
 with open(r"model\train_model\encoder.pkl", "rb") as f:
     encoder = pickle.load(f)
@@ -113,9 +113,14 @@ if st.session_state.run:
 
         # Run inference
         with torch.no_grad():
+            p_time_start = time.time()
             output = model(mel_spec)
-            probabilities = F.softmax(output, dim=1).cpu().numpy().flatten()
+            p_time_end = time.time()
+            p_time = p_time_end - p_time_start
+        
 
+            probabilities = F.softmax(output, dim=1).cpu().numpy().flatten()
+        
         # Sort probabilities
         sorted_indices = np.argsort(probabilities)
         sorted_probs = probabilities[sorted_indices]
@@ -163,7 +168,7 @@ if st.session_state.run:
 
             ax2.tick_params(axis='x', colors='white')
             ax2.tick_params(axis='y', colors='white')
-
+            fig.tight_layout()
             # Update the plot in Streamlit
             plot_placeholder.pyplot(fig)
 
