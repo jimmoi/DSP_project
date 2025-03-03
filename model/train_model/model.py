@@ -145,7 +145,7 @@ class InstrumentClassifier_CBAM(nn.Module):
         x = self.cbam2(x)
         x = self.bn2(x)
 
-        x = self.pool(F.relu(self.conv3(x)))  # (5, 32, 32)
+        x = F.relu(self.conv3(x))  # (5, 32, 32)
         x = self.cbam3(x)
 
         # Flatten

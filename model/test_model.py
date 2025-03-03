@@ -12,7 +12,7 @@ with timer("import lib"):
     import librosa
     import pickle
     import sounddevice as sd
-    from train_model.model import InstrumentClassifier_CBAM
+    from model.train_model.model import InstrumentClassifier_CBAM
     from collections import deque
     
 def list_audio_devices():

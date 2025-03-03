@@ -76,7 +76,7 @@ map_index_class = encoder["map_index_class"]
 model = InstrumentClassifier_CBAM(28)
 device = "cuda" if torch.cuda.is_available() else "cpu"
 model.to(device)
-model.load_state_dict(torch.load(r'D:\git_project\DSP_project\model\instrument_classifier_cbam_200_0.0001_weight.pt'))
+model.load_state_dict(torch.load(r'H:\DSP_project\ignoredir\model\instrument_classifier_cbam_200_0.0001_weight.pt'))
 model.eval()
 
 # Gain slider (1.0 = normal, >1.0 = amplify)
@@ -98,7 +98,7 @@ if st.session_state.run:
 
     while st.session_state.run:
         audio_data = stream.read(FRAMES_PER_BUFFER)
-        st.session_state.audio_frames.append(audio_data)
+        # st.session_state.audio_frames.append(audio_data)
 
         # Convert stored frames into a WAV file and apply gain
         # raw_audio = b"".join(st.session_state.audio_frames[-20])  # Use last 20 frames for real-time update
@@ -106,7 +106,6 @@ if st.session_state.run:
 
         # Convert audio to numpy array
         audio_np = np.frombuffer(amplified_audio, dtype=np.int16).astype(np.float32) / 32768.0
-        print(audio_np.shape)
         audio_np = librosa.util.normalize(audio_np)
         mel_spec = test_model.audio_to_melspectrogram(audio_np)
         mel_spec = torch.tensor(mel_spec).unsqueeze(0).unsqueeze(0).to(device)
