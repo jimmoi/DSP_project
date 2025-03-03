@@ -6,7 +6,7 @@ import wave
 import io
 sys.path.append(os.getcwd())
 import numpy as np
-from model import test_model2
+from model import test_model
 import torch
 import torch.nn.functional as F
 import librosa
@@ -66,7 +66,7 @@ device_index = device_indices[device_list.index(selected_device)]
 FORMAT = pyaudio.paInt16
 CHANNELS = 1
 RATE = 22050 #44100
-FRAMES_PER_BUFFER = int(RATE*1) #0.25
+FRAMES_PER_BUFFER = int(RATE*0.5) #0.25
 
 with open(r"model\train_model\encoder.pkl", "rb") as f:
     encoder = pickle.load(f)
@@ -76,7 +76,7 @@ map_index_class = encoder["map_index_class"]
 model = InstrumentClassifier_CBAM(28)
 device = "cuda" if torch.cuda.is_available() else "cpu"
 model.to(device)
-model.load_state_dict(torch.load(r'D:\git_project\DSP_project\ignoredir\instrument_classifier_cbam_300_0.00001_best2.pt'))
+model.load_state_dict(torch.load(r'D:\git_project\DSP_project\model\instrument_classifier_cbam_200_0.0001_weight.pt'))
 model.eval()
 
 # Gain slider (1.0 = normal, >1.0 = amplify)
@@ -98,81 +98,79 @@ if st.session_state.run:
 
     while st.session_state.run:
         audio_data = stream.read(FRAMES_PER_BUFFER)
-        print(len(audio_data))
         st.session_state.audio_frames.append(audio_data)
 
         # Convert stored frames into a WAV file and apply gain
-        if len(st.session_state.audio_frames) >= 22050:
-            print('not okay')
-            raw_audio = b"".join(st.session_state.audio_frames[-22050])  # Use last 20 frames for real-time update
-            amplified_audio = apply_gain(raw_audio, gain=gain)
-            # Convert audio to numpy array
-            audio_np = np.frombuffer(amplified_audio, dtype=np.int16).astype(np.float32) / 32768.0
-            print(audio_np.shape)
-            audio_np = librosa.util.normalize(audio_np)
-            mel_spec = test_model2.audio_to_melspectrogram(audio_np)
-            mel_spec = torch.tensor(mel_spec).unsqueeze(0).unsqueeze(0).to(device)
+        # raw_audio = b"".join(st.session_state.audio_frames[-20])  # Use last 20 frames for real-time update
+        amplified_audio = apply_gain(audio_data, gain=gain)
 
-            # Run inference
-            with torch.no_grad():
-                p_time_start = time.time()
-                output = model(mel_spec)
-                p_time_end = time.time()
-                p_time = p_time_end - p_time_start
-            
+        # Convert audio to numpy array
+        audio_np = np.frombuffer(amplified_audio, dtype=np.int16).astype(np.float32) / 32768.0
+        print(audio_np.shape)
+        audio_np = librosa.util.normalize(audio_np)
+        mel_spec = test_model.audio_to_melspectrogram(audio_np)
+        mel_spec = torch.tensor(mel_spec).unsqueeze(0).unsqueeze(0).to(device)
 
-                probabilities = F.softmax(output, dim=1).cpu().numpy().flatten()
-            
-            # Sort probabilities
-            sorted_indices = np.argsort(probabilities)
-            sorted_probs = probabilities[sorted_indices]
-            class_labels = list(map_index_class.values())
-            sorted_labels = [class_labels[i] for i in sorted_indices]
+        # Run inference
+        with torch.no_grad():
+            p_time_start = time.time()
+            output = model(mel_spec)
+            p_time_end = time.time()
+            p_time = p_time_end - p_time_start
+        
 
-            # 🔹 เลือกข้อมูลที่จะแสดง
-            top_n = -5
-            if st.session_state.expanded:
-                labels, probs = sorted_labels, sorted_probs  # แสดงทั้งหมด
-            else:
-                labels, probs = sorted_labels[top_n:], sorted_probs[top_n:]  # แสดง Top 5
+            probabilities = F.softmax(output, dim=1).cpu().numpy().flatten()
+        
+        # Sort probabilities
+        sorted_indices = np.argsort(probabilities)
+        sorted_probs = probabilities[sorted_indices]
+        class_labels = list(map_index_class.values())
+        sorted_labels = [class_labels[i] for i in sorted_indices]
 
-            if len(labels) == 0 or len(probs) == 0:
-                st.warning("No data available for plotting!")
-            else:
-                fig, (ax1, ax2) = st.session_state.fig, (st.session_state.ax1, st.session_state.ax2)
-                ax1.clear()
-                ax2.clear()
-                background_color = (12/255, 14/255, 19/255)
-                time_axis = np.linspace(0, 0.5, FRAMES_PER_BUFFER)
-                ax1.set_facecolor(background_color)
-                ax1.plot(time_axis, audio_np, color='cyan', linewidth=1.5)
-                ax1.set_title("Real-Time Audio Signal", color="white")
-                ax1.set_xlabel("Time (s)", color="white")
-                ax1.set_ylabel("Amplitude", color="white")
-                ax1.tick_params(axis='x', colors='white')
-                ax1.tick_params(axis='y', colors='white')
-                # Plot real-time classification probabilities
-                # fig, ax = plt.subplots(figsize=(6, max(len(labels) * 0.8, 4)))
-                fig.patch.set_facecolor(background_color)
-                ax2.set_facecolor(background_color)
+        # 🔹 เลือกข้อมูลที่จะแสดง
+        top_n = -5
+        if st.session_state.expanded:
+            labels, probs = sorted_labels, sorted_probs  # แสดงทั้งหมด
+        else:
+            labels, probs = sorted_labels[top_n:], sorted_probs[top_n:]  # แสดง Top 5
 
-                y_positions = [i * 2 for i in range(len(labels))]
+        if len(labels) == 0 or len(probs) == 0:
+            st.warning("No data available for plotting!")
+        else:
+            fig, (ax1, ax2) = st.session_state.fig, (st.session_state.ax1, st.session_state.ax2)
+            ax1.clear()
+            ax2.clear()
+            background_color = (12/255, 14/255, 19/255)
+            time_axis = np.linspace(0, 0.5, FRAMES_PER_BUFFER)
+            ax1.set_facecolor(background_color)
+            ax1.plot(time_axis, audio_np, color='cyan', linewidth=1.5)
+            ax1.set_title("Real-Time Audio Signal", color="white")
+            ax1.set_xlabel("Time (s)", color="white")
+            ax1.set_ylabel("Amplitude", color="white")
+            ax1.tick_params(axis='x', colors='white')
+            ax1.tick_params(axis='y', colors='white')
+            # Plot real-time classification probabilities
+            # fig, ax = plt.subplots(figsize=(6, max(len(labels) * 0.8, 4)))
+            fig.patch.set_facecolor(background_color)
+            ax2.set_facecolor(background_color)
 
-                ax2.barh(y_positions, probs, height=1, color="blue")
+            y_positions = [i * 2 for i in range(len(labels))]
 
-                ax2.set_yticks(y_positions)
-                ax2.set_yticklabels(labels, color='white')
-                # ax.tick_params(axis='y', colors='white')
+            ax2.barh(y_positions, probs, height=1, color="blue")
 
-                ax2.set_xlim(0, 1)
-                ax2.set_xlabel("Probability", color='white')
-                ax2.set_title("Real-Time Classification Probabilities", color='white')
+            ax2.set_yticks(y_positions)
+            ax2.set_yticklabels(labels, color='white')
+            # ax.tick_params(axis='y', colors='white')
 
-                ax2.tick_params(axis='x', colors='white')
-                ax2.tick_params(axis='y', colors='white')
-                fig.tight_layout()
-                # Update the plot in Streamlit
-                plot_placeholder.pyplot(fig)
+            ax2.set_xlim(0, 1)
+            ax2.set_xlabel("Probability", color='white')
+            ax2.set_title("Real-Time Classification Probabilities", color='white')
+
+            ax2.tick_params(axis='x', colors='white')
+            ax2.tick_params(axis='y', colors='white')
+            fig.tight_layout()
+            # Update the plot in Streamlit
+            plot_placeholder.pyplot(fig)
 
             time.sleep(0.1)  # Update interval
 
